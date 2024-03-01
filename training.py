@@ -42,7 +42,8 @@ def train(task_list, args, train_data, test_data, model):
 
     combined_sigma = 0
 
-    if args.task_type == 'concept': if_shift = []
+    if args.task_type == 'concept':
+        if_shift = []
 
     for task_id in range(len(task_list)):
         task_loss_list = []
@@ -51,6 +52,7 @@ def train(task_list, args, train_data, test_data, model):
             t_train = train_data.make_dataset(task_id)
             t_test = test_data.make_dataset(task_id)
         else:
+            # todo: here if t_test is used as validation CALL IT T_VAL, NOT T_TEST, THIS IS CONFUSING!
             t_train, t_test = train_data.make_dataset(task_id)
 
         if args.calibration:
@@ -58,7 +60,7 @@ def train(task_list, args, train_data, test_data, model):
             assert args.cal_epochs > 0
             assert args.cal_size > 0
             t_train, t_cal = calibration_dataset(args, t_train)
-            calibration_loaders.append(make_loader(t_cal, args, train='calibration'))
+            calibration_loaders.append(make_loader(t_cal, args, train='calibration')) #todo: check when this is used
 
         train_loaders.append(make_loader(t_train, args, train='train'))
         test_loaders.append(make_loader(t_test, args, train='test'))
@@ -107,7 +109,9 @@ def train(task_list, args, train_data, test_data, model):
                 til_tracker = saving_buffer['til_tracker']
                 continue
 
+        # Here the model add the embeddings and the classification head for the specific tasks
         if hasattr(model, 'preprocess_task'):
+            # todo: here the model knows already the final number of classes, we can fix it
             model.preprocess_task(names=train_data.task_list[task_id][0],
                                   labels=train_data.task_list[task_id][1],
                                   task_id=task_id,
@@ -138,6 +142,9 @@ def train(task_list, args, train_data, test_data, model):
             model.reset_eval()
             # orig is the original data (mostly likely numpy for CIFAR, and indices for ImageNet)
             for b, (x, y, f_y, names, orig) in tqdm(enumerate(current_train_loader)):
+                if b > 2:
+                    break
+                # for b, (x, y) in tqdm(enumerate(current_train_loader)):
                 # for simplicity, consider that we know the labels ahead
                 f_y = f_y[:, 1]
                 x, y = x.to(args.device), y.to(args.device)

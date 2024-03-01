@@ -456,7 +456,11 @@ class ViTAdapter(BaseModel):
         self.feature_list, self.label_list = [], []
 
     def update_s(self, b, B):
-        """ b: current batch, B: total num batch """
+        """
+        @param b: current batch
+        @param B: total num batch
+        @return: #todo: WHAT?
+        """
         s = (self.args.smax - 1 / self.args.smax) * b / B + 1 / self.args.smax
         return s
 

@@ -16,9 +16,17 @@ import timm
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def augmentations(args):
+    """
+    Args used:
+    '--model', type=str, default='derpp', choices=[giant list of models, check common.parse_args]
+    '--logger', logger designed from scratch for unexplainable reasons, TODO: conform it with the logging python module
+    '--dataset', type=str, default='cifar100', choices=['mnist', 'cifar100', 'cifar10', 'timgnet', 'imagenet']
+    '--device'
+
+    """
     if args.model == 'moco_feature':
         args.logger.print('Using the moco augmentations (resize 256)')
         TRANSFORM = transforms.Compose([
@@ -83,8 +91,8 @@ def augmentations(args):
         return train_transform, test_transform
     elif 'vitadapter' in args.model or 'deit' in args.model:
         args.logger.print('Using augmentations of ViT')
-        model_type = 'deit_small_patch16_224' # model_type can be anything as long as it's ViT or Deit
-        model_ = timm.create_model(model_type, pretrained=False, num_classes=1).cuda()
+        model_type = 'deit_small_patch16_224'   # model_type can be anything as long as it's ViT or Deit
+        model_ = timm.create_model(model_type, pretrained=False, num_classes=1).to(args.device)
 
         # from networks.my_vit import deit_small_patch16_224 as transformer
         # from timm.data import resolve_data_config
@@ -158,7 +166,7 @@ class StandardCL:
         data_aux, data_aux_valid = [], []
         full_targets_aux, full_targets_aux_valid = [], []
         names_aux, names_aux_valid = [], []
-        cls_names =  self.task_list[task_id][0]
+        cls_names = self.task_list[task_id][0]
         cls_ids = self.task_list[task_id][1]
         idx_list, idx_list_valid = [], [] # These are used for ImageNet
         for i, (name, c) in enumerate(zip(cls_names, cls_ids)):
@@ -178,7 +186,7 @@ class StandardCL:
 
             if self.args.dataset in ['cifar100', 'cifar10', 'mnist']:
                 data_aux.append(self.dataset.data[idx])
-                targets_aux.append(np.zeros(len(idx), dtype=np.int) + self.seen_names.index(name))
+                targets_aux.append(np.zeros(len(idx), dtype=int) + self.seen_names.index(name))
                 full_targets_aux.append([[self.seen_names.index(name),
                                           self.seen_names.index(name)] for _ in range(len(idx))])
                 names_aux.append([name for _ in range(len(idx))])
@@ -250,31 +258,35 @@ class StandardCL:
             return dataset_, dataset_valid
 
 def get_data(args):
+    """
+    args used:
+    '--dataset', type=str, default='cifar100', choices=['mnist', 'cifar100', 'cifar10', 'timgnet', 'imagenet']
+    """
     train_transform, test_transform = augmentations(args)
-    args.root = './'
+    dataset_root_path = 'heavy_data/datasets'
 
     if args.dataset == 'mnist':
-        train = MNIST(root=args.root, train=True, download=True, transform=train_transform)
-        test  = MNIST(root=args.root, train=False, download=True, transform=test_transform)
+        train = MNIST(root=dataset_root_path, train=True, download=True, transform=train_transform)
+        test = MNIST(root=dataset_root_path, train=False, download=True, transform=test_transform)
     elif args.dataset == 'cifar100':
-        train = CIFAR100(root=args.root, train=True, download=True, transform=train_transform)
-        test  = CIFAR100(root=args.root, train=False, download=True, transform=test_transform)
+        train = CIFAR100(root=dataset_root_path, train=True, download=True, transform=train_transform)
+        test = CIFAR100(root=dataset_root_path, train=False, download=True, transform=test_transform)
     elif args.dataset == 'cifar10':
-        train = CIFAR10(root=args.root, train=True, download=True, transform=train_transform)
-        test  = CIFAR10(root=args.root, train=False, download=True, transform=test_transform)
+        train = CIFAR10(root=dataset_root_path, train=True, download=True, transform=train_transform)
+        test = CIFAR10(root=dataset_root_path, train=False, download=True, transform=test_transform)
     elif args.dataset == 'imagenet':
-        train = ImageFolder(root=args.root + '/ImageNet/train', transform=train_transform)
-        test = ImageFolder(root=args.root + '/ImageNet/val', transform=test_transform)
+        train = ImageFolder(root=dataset_root_path + '/ImageNet/train', transform=train_transform)
+        test = ImageFolder(root=dataset_root_path + '/ImageNet/val', transform=test_transform)
     elif args.dataset == 'timgnet':
-        train = ImageFolder(root=args.root + '/TinyImagenet/train', transform=train_transform)
-        test = ImageFolder(root=args.root + '/TinyImagenet/val_folders', transform=test_transform)
+        train = ImageFolder(root=dataset_root_path + '/TinyImagenet/train', transform=train_transform)
+        test = ImageFolder(root=dataset_root_path + '/TinyImagenet/val_folders', transform=test_transform)
     if args.validation and ('cifar' in args.dataset or 'mnist' in args.dataset):
         pass
     elif args.validation and args.dataset == 'imagenet':
         if args.dataset == 'imagenet':
-            test = ImageFolder(root=args.root + '/ImageNet/train', transform=train_transform)
+            test = ImageFolder(root=dataset_root_path + '/ImageNet/train', transform=train_transform)
         elif args.dataset == 't-imagenet':
-            test = ImageFolder(root=args.root + '/TinyImagenet/train', transform=test_transform)
+            test = ImageFolder(root=dataset_root_path + '/TinyImagenet/train', transform=test_transform)
 
     train = ClassSplit(args).relabel(train)
     test = ClassSplit(args).relabel(test)

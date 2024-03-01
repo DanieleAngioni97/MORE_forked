@@ -244,8 +244,8 @@ class Adapter(nn.Module):
         return out
 
     def append_embedddings(self):
-        self.ec1.append(nn.Parameter(torch.randn(1, self.out_dim, device='cuda')))
-        self.ec2.append(nn.Parameter(torch.randn(1, self.in_dim, device='cuda')))
+        self.ec1.append(nn.Parameter(torch.randn(1, self.out_dim)))
+        self.ec2.append(nn.Parameter(torch.randn(1, self.in_dim)))
 
 class Block(nn.Module):
 
@@ -271,7 +271,7 @@ class Block(nn.Module):
             self.drop_path(self.attn(self.list_norm1[t](x))),
             msk,
             s
-            )
+        )
         x = x + h
 
         h, msk = self.adapter2(
@@ -401,6 +401,12 @@ class MyVisionTransformer(nn.Module):
             self.head_dist = nn.Linear(self.embed_dim, self.num_classes) if num_classes > 0 else nn.Identity()
 
     def forward_features(self, t, x, s):
+        """
+        @param t: task id
+        @param x:
+        @param s: something that summarize batch_id / num_batches
+        @return: features
+        """
         msk = []
         x = self.patch_embed(x)
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
@@ -446,7 +452,7 @@ class MyVisionTransformer(nn.Module):
 
     def append_embedddings(self):
         # append head
-        self.head.append(nn.Linear(self.embed_dim, self.num_classes).cuda())
+        self.head.append(nn.Linear(self.embed_dim, self.num_classes))
 
         self.list_norm.append(deepcopy(self.norm))
         for b in self.blocks:

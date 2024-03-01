@@ -4,6 +4,7 @@ from utils.best_args import best_args
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('--root', type=str, default='./')
+    parser.add_argument('--cuda_id', type=int, default=0)
     parser.add_argument('--load_dir', type=str, default=None, help='if provided, load model and test')
     parser.add_argument('--load_task_id', type=int, default=None)
     parser.add_argument('--print_filename', type=str, default=None, help="if None, prints on 'result.txt' file")
@@ -24,6 +25,43 @@ def parse_args():
                                                                         'owm_vitadapter', 'owm_deitadapter',
                                                                         'hal_vitadapter', 'hal_deitadapter',
                                                                         'vitadapter_hat_amp'])
+
+
+    """
+    Baseline Systems:
+    Gradient Modification:
+        - OWM
+    Replay-based methods:
+        - iCaRL
+        - A-GEM
+        - EEIL
+        - GD without external data
+        - DER++
+        - HAL
+    Pseudo-replay methods:
+        - PASS
+    Multi-Head methods:
+        - HAT (using task-id prediction method in HyperNet) 
+        
+    
+    choices=['derpp', 'derpp_deit', 'joint', 'owm', 'birch', 'ood', 'hier',
+            'hcluster', 'oe', 'oe_fixed_minibatch', 'maha', 'maha_oe',
+            'batch_pca', 'batch_pca_task', 'batch_pca_single',
+            'batch_pca_deit', 'batch_pca_task_deit', 'batch_pca_single_deit',
+            'maha_ipca', 'maha_ipca_task', 'maha_ipca_single',
+            'maha_ipca_deit', 'maha_ipca_task_deit' 'maha_ipca_single_deit',
+            'agem_r', 'singleSigma', 'hal', 'moco_feature', 'vitadapter_more',
+            'clipadapter', 'clipadapter_hat', 'clipadapter_amp',
+            'clipadapter_hat_amp', 'derpp_vitadapter',
+            'derpp_deitadapter', 'deitadapter_more',
+            'pass_fixed_deit', 'pass_vitadapter', 'pass_deitadapter', 'pass_resnet18', 'pass_alexnet',
+            'icarl_vitadapter', 'icarl_deitadapter',
+            'agem_r_vitadapter', 'agem_r_deitadapter',
+            'owm_vitadapter', 'owm_deitadapter',
+            'hal_vitadapter', 'hal_deitadapter',
+            'vitadapter_hat_amp']
+    """
+
     parser.add_argument('--noCL', action='store_true')
     parser.add_argument('--task_type', type=str, default='standardCL_randomcls',
                             choices=['cov', 'concept', 'pre-define',

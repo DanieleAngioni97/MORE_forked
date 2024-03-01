@@ -2,6 +2,14 @@ import numpy as np
 
 class ClassSplit:
 	def __init__(self, args):
+		"""
+		Here they initialize the dataset name and the class order, which is hardcoded in self.split
+		Args used:
+		- logger
+		- class_order
+		- dataset
+
+		"""
 		args.logger.print(f"Using class split: {args.class_order}")
 		self.dataset = args.dataset
 
@@ -68,6 +76,8 @@ class ClassSplit:
 			target_copy[idx] = new_y
 
 		dataset.targets = target_copy.copy()
+		#todo: cose strane qui, da errore facendo get di un dato
+		#todo: altra cosa losca, riassegna le label ma non mischia i sample allo stesso modo
 
 		if self.dataset == 'timgnet' or self.dataset == 'imgnet':
 			samples_copy = dataset.samples.copy()
