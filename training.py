@@ -45,6 +45,11 @@ def train(task_list, args, train_data, test_data, model):
     if args.task_type == 'concept':
         if_shift = []
 
+    ########################################################################################################
+    ########################################################################################################
+    # TASKS LOOP
+    ########################################################################################################
+    ########################################################################################################
     for task_id in range(len(task_list)):
         task_loss_list = []
 
@@ -137,13 +142,16 @@ def train(task_list, args, train_data, test_data, model):
             param_copy = model.net.fc.weight.detach()
             print(param_copy.sum(1))
 
+        ########################################################################################################
+        ########################################################################################################
+        # EPOCHS LOOP
+        ########################################################################################################
+        ########################################################################################################
         for epoch in range(args.n_epochs):
             iters = []
             model.reset_eval()
             # orig is the original data (mostly likely numpy for CIFAR, and indices for ImageNet)
             for b, (x, y, f_y, names, orig) in tqdm(enumerate(current_train_loader)):
-                if b > 2:
-                    break
                 # for b, (x, y) in tqdm(enumerate(current_train_loader)):
                 # for simplicity, consider that we know the labels ahead
                 f_y = f_y[:, 1]
@@ -160,9 +168,13 @@ def train(task_list, args, train_data, test_data, model):
 
                 total_loss_list.append(loss)
                 task_loss_list.append(loss)
-                cum_acc_list.append(model.correct / model.total * 100)
+                cum_acc = model.correct / model.total * 100
+                cum_acc_list.append(cum_acc)
                 iters.append(total_iter)
                 total_iter += 1
+                args.logger.print(f"e:[{epoch + 1}/{args.n_epochs}], b:[{b}/{len(current_train_loader)}]"\
+                                   f"-- Loss: {loss}, Cum. Acc.: {cum_acc}")
+                
             iter_list.append(iters)
 
             if epoch == 0 and args.zero_shot:
@@ -183,151 +195,220 @@ def train(task_list, args, train_data, test_data, model):
                 out_dim, _ = param_copy.size()
                 model.net.fc.weight.data[:out_dim] = param_copy.data
 
-            # Save features for MD statistics, use TRAIN data
-            if (epoch + 1) == args.n_epochs:
-                # If compute_md is true, obtain the features and compute/save the statistics for MD
-                if args.compute_md:
-                    # First obtain the features
-                    model.reset_eval()
-                    for x, y, _, _, _ in train_loaders[-1]:
-                        x, y = x.to(args.device), y.to(args.device)
-                        with torch.no_grad():
-                            if args.model_clip:
-                                x = args.model_clip.encode_image(x).type(torch.FloatTensor).to(args.device)
-                            elif args.model_vit:
-                                x = args.model_vit.forward_features(x)
-                            if args.zero_shot:
-                                text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_data.seen_names]).to(args.device)
-                                zeroshot.evaluate(x, text_inputs, y)
-                        model.evaluate(x, y, task_id, report_cil=False, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
-                    feature_list = np.concatenate(model.feature_list)
-                    label_list = np.concatenate(model.label_list)
-                    torch.save(feature_list,
-                                args.logger.dir() + f'/feature_task_{task_id}')
-                    torch.save(label_list,
-                                args.logger.dir() + f'/label_task_{task_id}')
-                    cov_list = []
-                    ys = list(sorted(set(label_list)))
-                    # Compute/save the statistics for MD
-                    for y in ys:
-                        idx = np.where(label_list == y)[0]
-                        f = feature_list[idx]
-                        cov = np.cov(f.T)
-                        cov_list.append(cov)
-                        mean = np.mean(f, 0)
-                        np.save(args.logger.dir() + f'mean_label_{y}', mean)
-                        args.mean[y] = mean
-                    cov = np.array(cov_list).mean(0)
-                    np.save(args.logger.dir() + f'cov_task_{task_id}', cov)
-                    args.cov[task_id] = cov
-                    args.cov_inv[task_id] = np.linalg.inv(cov)
-                    # For MD-noise
-                    mean = np.mean(feature_list, axis=0)
-                    np.save(args.logger.dir() + f'mean_task_{task_id}', mean)
-                    # args.mean_task[task_id] = mean
-                    cov = np.cov(feature_list.T)
-                    np.save(args.logger.dir() + f'cov_task_noise_{task_id}', cov)
-                    # args.cov_noise[task_id] = cov
-                    # args.cov_inv_noise[task_id] = np.linalg.inv(cov)
-                    if args.noise:
-                        args.mean_task[task_id] = mean
-                        args.cov_noise[task_id] = cov
-                        args.cov_inv_noise[task_id] = np.linalg.inv(cov)
 
-                if (epoch + 1) == args.n_epochs:
-                    args.logger.print("End task...")
-                    # End task
-                    if hasattr(model, 'end_task'):
-                        if args.calibration:
-                            model.end_task(calibration_loaders, test_loaders, train_loader=train_loaders[-1])
+            # # If compute_md is true, obtain the features and compute/save the statistics for MD
+            # if args.compute_md:
+            #     args.logger.print("Computing Mahalanobis distance on the current training set...")
+            #     # First obtain the features
+            #     model.reset_eval()
+            #     for x, y, _, _, _ in train_loaders[-1]:
+            #         x, y = x.to(args.device), y.to(args.device)
+            #         with torch.no_grad():
+            #             if args.model_clip:
+            #                 x = args.model_clip.encode_image(x).type(torch.FloatTensor).to(args.device)
+            #             elif args.model_vit:
+            #                 x = args.model_vit.forward_features(x)
+            #             if args.zero_shot:
+            #                 text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_data.seen_names]).to(args.device)
+            #                 zeroshot.evaluate(x, text_inputs, y)
+            #         model.evaluate(x, y, task_id, report_cil=False, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
+            #     feature_list = np.concatenate(model.feature_list)
+            #     label_list = np.concatenate(model.label_list)
+            #     torch.save(feature_list,
+            #                 os.path.join(args.logger.dir(), f"feature_task_{task_id}"))
+            #     torch.save(label_list,
+            #                os.path.join(args.logger.dir(), f"label_task_{task_id}"))
+            #     cov_list = []
+            #     ys = list(sorted(set(label_list)))
+            #     # Compute/save the statistics for MD
+            #     for y in ys:
+            #         idx = np.where(label_list == y)[0]
+            #         f = feature_list[idx]
+            #         cov = np.cov(f.T)
+            #         cov_list.append(cov)
+            #         mean = np.mean(f, 0)
+            #         np.save(args.logger.dir() + f'mean_label_{y}', mean)
+            #         args.mean[y] = mean
+            #     cov = np.array(cov_list).mean(0)
+            #     np.save(args.logger.dir() + f'cov_task_{task_id}', cov)
+            #     args.cov[task_id] = cov
+            #     args.cov_inv[task_id] = np.linalg.inv(cov)
+            #     # For MD-noise
+            #     mean = np.mean(feature_list, axis=0)
+            #     np.save(args.logger.dir() + f'mean_task_{task_id}', mean)
+            #     # args.mean_task[task_id] = mean
+            #     cov = np.cov(feature_list.T)
+            #     np.save(args.logger.dir() + f'cov_task_noise_{task_id}', cov)
+            #     # args.cov_noise[task_id] = cov
+            #     # args.cov_inv_noise[task_id] = np.linalg.inv(cov)
+            #     if args.noise:
+            #         args.mean_task[task_id] = mean
+            #         args.cov_noise[task_id] = cov
+            #         args.cov_inv_noise[task_id] = np.linalg.inv(cov)
+
+            #     args.logger.print("End task...")
+            #     # End task
+            #     if hasattr(model, 'end_task'):
+            #         if args.calibration:
+            #             model.end_task(calibration_loaders, test_loaders, train_loader=train_loaders[-1])
+            #         else:
+            #             model.end_task(task_id + 1, train_loader=train_loaders[-1])
+            
+            ########################################################################################################
+            ########################################################################################################
+            # PER-EPOCH EVALUATION
+            ########################################################################################################
+            ########################################################################################################
+            #TODO: where is eval_every?
+            args.logger.print("Evaluating CIL and TIL of current task at eval_every")
+            model.reset_eval()
+            for batch in test_loaders[-1]:
+                x, y, *_ = batch
+                x, y = x.to(args.device), y.to(args.device)
+                with torch.no_grad():
+                    if args.model_clip:
+                        x = args.model_clip.encode_image(x).type(torch.FloatTensor).to(args.device)
+                    elif args.model_vit:
+                        x = args.model_vit.forward_features(x)
+                    if args.zero_shot:
+                        text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_data.seen_names]).to(args.device)
+                        zeroshot.evaluate(x, text_inputs, y)
+                model.evaluate(x, y, task_id, report_cil=True, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
+            metrics = model.acc()
+            args.logger.print(f"Task {task_id}, Epoch {epoch + 1}/{args.n_epochs}, Total Loss: {np.mean(task_loss_list):.4f}, "\
+                              f"CIL Acc: {metrics['cil_acc']:.2f}, TIL Acc: {metrics['til_acc']:.2f}")
+
+            # if compute_AUC is true, compute its AUC at eval_every
+            if args.compute_auc:
+                args.logger.print("Evaluating AUC current task at eval_every")
+                in_scores = metrics['scores']
+                # if args.compute_md: 
+                if args.use_md:
+                    in_scores_md = metrics['scores_md']
+                auc_list, auc_list_md = [], []
+                auc_total_in_list, auc_total_out_list, out_id_list = [metrics['scores_total']], [], []
+                for task_out in range(args.n_tasks):
+                    if task_out != task_id:
+                        if args.validation is None:
+                            t_test = test_data.make_dataset(task_out)
                         else:
-                            model.end_task(task_id + 1, train_loader=train_loaders[-1])
+                            _, t_test = train_data.make_dataset(task_out)
+                        ood_loader = make_loader(t_test, args, train='test')
+                        for x, y, _, _, _ in ood_loader:
+                            x, y = x.to(args.device), y.to(args.device)
+                            with torch.no_grad():
+                                model.evaluate(x, y, task_id=task_id, report_cil=True, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
+                        metrics = model.acc()
 
-                # Evaluate CIL and TIL of current task at eval_every
-                model.reset_eval()
-                for x, y, _, _, _ in test_loaders[-1]:
-                    x, y = x.to(args.device), y.to(args.device)
-                    with torch.no_grad():
-                        if args.model_clip:
-                            x = args.model_clip.encode_image(x).type(torch.FloatTensor).to(args.device)
-                        elif args.model_vit:
-                            x = args.model_vit.forward_features(x)
-                        if args.zero_shot:
-                            text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_data.seen_names]).to(args.device)
-                            zeroshot.evaluate(x, text_inputs, y)
-                    model.evaluate(x, y, task_id, report_cil=True, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
-                metrics = model.acc()
-                args.logger.print("Task {}, Epoch {}/{}, Total Loss: {:.4f}, CIL Acc: {:.2f}, TIL Acc: {:.2f}".format(task_id,
-                                    epoch + 1, args.n_epochs, np.mean(task_loss_list),
-                                    metrics['cil_acc'], metrics['til_acc']))
+                        out_scores = metrics['scores']
+                        auc = compute_auc(in_scores, out_scores)
+                        auc_list.append(auc * 100)
+                        args.logger.print("Epoch {}/{} | in/out: {}/{} | Softmax AUC: {:.2f}".format(epoch + 1, args.n_epochs, task_id, task_out, auc_list[-1]), end=' ')
+                        auc_softmax_tracker.update(auc_list[-1], task_id, task_out)
 
-                # if compute_AUC is true, compute its AUC at eval_every
-                if args.compute_auc:
-                    in_scores = metrics['scores']
-                    if args.compute_md: in_scores_md = metrics['scores_md']
-                    auc_list, auc_list_md = [], []
-                    auc_total_in_list, auc_total_out_list, out_id_list = [metrics['scores_total']], [], []
-                    for task_out in range(args.n_tasks):
-                        if task_out != task_id:
-                            if args.validation is None:
-                                t_test = test_data.make_dataset(task_out)
-                            else:
-                                _, t_test = train_data.make_dataset(task_out)
-                            ood_loader = make_loader(t_test, args, train='test')
-                            for x, y, _, _, _ in ood_loader:
-                                x, y = x.to(args.device), y.to(args.device)
-                                with torch.no_grad():
-                                    model.evaluate(x, y, task_id=task_id, report_cil=True, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
-                            metrics = model.acc()
+                        # if args.compute_md:
+                        if args.use_md:
+                            out_scores_md = metrics['scores_md']
+                            auc_md = compute_auc(in_scores_md, out_scores_md)
+                            auc_list_md.append(auc_md * 100)
+                            args.logger.print("| MD AUC: {:.2f}".format(auc_list_md[-1]))
+                            auc_md_tracker.update(auc_list_md[-1], task_id, task_out)
+                        else:
+                            args.logger.print('')
 
-                            out_scores = metrics['scores']
-                            auc = compute_auc(in_scores, out_scores)
-                            auc_list.append(auc * 100)
-                            args.logger.print("Epoch {}/{} | in/out: {}/{} | Softmax AUC: {:.2f}".format(epoch + 1, args.n_epochs, task_id, task_out, auc_list[-1]), end=' ')
-                            auc_softmax_tracker.update(auc_list[-1], task_id, task_out)
+                        if task_out <= task_id:
+                            auc_total_in_list.append(metrics['scores_total'])
+                        else:
+                            auc_total_out_list.append(metrics['scores_total'])
+                            out_id_list.append(task_out)
 
-                            if args.compute_md:
-                                out_scores_md = metrics['scores_md']
-                                auc_md = compute_auc(in_scores_md, out_scores_md)
-                                auc_list_md.append(auc_md * 100)
-                                args.logger.print("| MD AUC: {:.2f}".format(auc_list_md[-1]))
-                                auc_md_tracker.update(auc_list_md[-1], task_id, task_out)
-                            else:
-                                args.logger.print('')
+                args.logger.print("Epoch {}/{} | Average Softmax AUC: {:.2f}".format(epoch + 1, args.n_epochs, np.array(auc_list).mean()), end=' ')
+                if args.compute_md:
+                    args.logger.print("| Average MD AUC: {:.2f}".format(np.array(auc_list_md).mean()))
+                else:
+                    args.logger.print('')
 
-                            if task_out <= task_id:
-                                auc_total_in_list.append(metrics['scores_total'])
-                            else:
-                                auc_total_out_list.append(metrics['scores_total'])
-                                out_id_list.append(task_out)
+                for task_out, out_scores in zip(out_id_list, auc_total_out_list):
+                    auc = compute_auc(auc_total_in_list, out_scores)
+                    args.logger.print("Epoch {}/{} | total in/out: {}/{} | AUC: {:.2f}".format(epoch + 1, args.n_epochs, task_id, task_out, auc * 100))
+                    openworld_softmax_tracker.update(auc * 100, task_id, task_out)
+                if len(auc_total_in_list) > 0 and len(auc_total_out_list) > 0:
+                    auc = compute_auc(auc_total_in_list, auc_total_out_list)
+                    args.logger.print("Epoch {}/{} | total in | AUC: {:.2f}".format(epoch + 1, args.n_epochs, auc * 100))
 
-                    args.logger.print("Epoch {}/{} | Average Softmax AUC: {:.2f}".format(epoch + 1, args.n_epochs, np.array(auc_list).mean()), end=' ')
-                    if args.compute_md:
-                        args.logger.print("| Average MD AUC: {:.2f}".format(np.array(auc_list_md).mean()))
-                    else:
-                        args.logger.print('')
-
-                    for task_out, out_scores in zip(out_id_list, auc_total_out_list):
-                        auc = compute_auc(auc_total_in_list, out_scores)
-                        args.logger.print("Epoch {}/{} | total in/out: {}/{} | AUC: {:.2f}".format(epoch + 1, args.n_epochs, task_id, task_out, auc * 100))
-                        openworld_softmax_tracker.update(auc * 100, task_id, task_out)
-                    if len(auc_total_in_list) > 0 and len(auc_total_out_list) > 0:
-                        auc = compute_auc(auc_total_in_list, auc_total_out_list)
-                        args.logger.print("Epoch {}/{} | total in | AUC: {:.2f}".format(epoch + 1, args.n_epochs, auc * 100))
-
-                # Save model elements required for resuming training
-                if hasattr(model, 'save'):
-                    model.save(state_dict=model.net.state_dict(),
-                                optimizer=model.optimizer,
-                                task_id=task_id,
-                                epoch=epoch + 1,
-                                cil_tracker=cil_tracker,
-                                til_tracker=til_tracker,
-                                auc_softmax_tracker=auc_softmax_tracker,
-                                auc_md_tracker=auc_md_tracker)
+            # Save model elements required for resuming training
+            if hasattr(model, 'save'):
+                model.save(state_dict=model.net.state_dict(),
+                            optimizer=model.optimizer,
+                            task_id=task_id,
+                            epoch=epoch + 1,
+                            cil_tracker=cil_tracker,
+                            til_tracker=til_tracker,
+                            auc_softmax_tracker=auc_softmax_tracker,
+                            auc_md_tracker=auc_md_tracker)
         # Save
         torch.save(model.net.state_dict(),
-                    args.logger.dir() + f'model_task_{task_id}')
+                    os.path.join(args.logger.dir(), f'model_task_{task_id}'))
+        
+
+        # If compute_md is true, obtain the features and compute/save the statistics for MD
+        if args.compute_md:
+            args.logger.print("Computing Mahalanobis distance on the current training set...")
+            # First obtain the features
+            model.reset_eval()
+            for x, y, _, _, _ in train_loaders[-1]:
+                x, y = x.to(args.device), y.to(args.device)
+                with torch.no_grad():
+                    if args.model_clip:
+                        x = args.model_clip.encode_image(x).type(torch.FloatTensor).to(args.device)
+                    elif args.model_vit:
+                        x = args.model_vit.forward_features(x)
+                    if args.zero_shot:
+                        text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_data.seen_names]).to(args.device)
+                        zeroshot.evaluate(x, text_inputs, y)
+                model.evaluate(x, y, task_id, report_cil=False, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
+            feature_list = np.concatenate(model.feature_list)
+            label_list = np.concatenate(model.label_list)
+            torch.save(feature_list,
+                        os.path.join(args.logger.dir(), f"feature_task_{task_id}"))
+            torch.save(label_list,
+                        os.path.join(args.logger.dir(), f"label_task_{task_id}"))
+            cov_list = []
+            ys = list(sorted(set(label_list)))
+            # Compute/save the statistics for MD
+            for y in ys:
+                idx = np.where(label_list == y)[0]
+                f = feature_list[idx]
+                cov = np.cov(f.T)
+                cov_list.append(cov)
+                mean = np.mean(f, 0)
+                np.save(args.logger.dir() + f'mean_label_{y}', mean)
+                args.mean[y] = mean
+            cov = np.array(cov_list).mean(0)
+            np.save(args.logger.dir() + f'cov_task_{task_id}', cov)
+            args.cov[task_id] = cov
+            args.cov_inv[task_id] = np.linalg.inv(cov)
+            # For MD-noise
+            mean = np.mean(feature_list, axis=0)
+            np.save(args.logger.dir() + f'mean_task_{task_id}', mean)
+            # args.mean_task[task_id] = mean
+            cov = np.cov(feature_list.T)
+            np.save(args.logger.dir() + f'cov_task_noise_{task_id}', cov)
+            # args.cov_noise[task_id] = cov
+            # args.cov_inv_noise[task_id] = np.linalg.inv(cov)
+            if args.noise:
+                args.mean_task[task_id] = mean
+                args.cov_noise[task_id] = cov
+                args.cov_inv_noise[task_id] = np.linalg.inv(cov)
+
+            args.logger.print("End task...")
+            # End task
+            if hasattr(model, 'end_task'):
+                if args.calibration:
+                    model.end_task(calibration_loaders, test_loaders, train_loader=train_loaders[-1])
+                else:
+                    model.end_task(task_id + 1, train_loader=train_loaders[-1])
+
         if args.calibration:
             if model.w is not None:
                 torch.save(model.w.data,
@@ -337,13 +418,20 @@ def train(task_list, args, train_data, test_data, model):
 
         # Save statistics e.g. mean, cov, cov_inv
         if args.save_statistics:
-            np.save(args.logger.dir() + 'statistics', model.statistics)
+            np.save(os.path.join(args.logger.dir(), 'statistics'), 
+                    model.statistics)
 
         args.logger.print("######################")
+        ########################################################################################################
+        ########################################################################################################
+        # PER TASK EVALUATION
+        ########################################################################################################
+        ########################################################################################################
         true_lab, pred_lab = [], []
         for p_task_id, loader in enumerate(test_loaders):
             model.reset_eval()
-            for x, y, _, _, _ in loader:
+            for batch in loader:
+                x, y, *_ = batch
                 x, y = x.to(args.device), y.to(args.device)
                 with torch.no_grad():
                     if args.model_clip:
@@ -352,9 +440,14 @@ def train(task_list, args, train_data, test_data, model):
                         x = args.model_vit.forward_features(x)
                 model.evaluate(x, y, task_id=p_task_id, report_cil=True, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
             if args.save_output:
-                np.save(args.logger.dir() + 'output_learned_{}_task_{}'.format(task_id, p_task_id),
+                
+                # np.save(args.logger.dir() + 'output_learned_{}_task_{}'.format(task_id, p_task_id),
+                #                                         np.concatenate(model.output_list))
+                np.save(os.path.join(f"{args.logger.dir()}output_learned_{task_id}_task_{p_task_id}"),
                                                         np.concatenate(model.output_list))
-                np.save(args.logger.dir() + 'label_learned_{}_task_{}'.format(task_id, p_task_id),
+                # np.save(args.logger.dir() + 'label_learned_{}_task_{}'.format(task_id, p_task_id),
+                #                                         np.concatenate(model.label_list))
+                np.save(os.path.join(f"{args.logger.dir()}label_learned_{task_id}_task_{p_task_id}"),
                                                         np.concatenate(model.label_list))
 
             metrics = model.acc()
@@ -375,12 +468,12 @@ def train(task_list, args, train_data, test_data, model):
                 true_lab.append(true_lab_)
                 pred_lab.append(pred_lab_)
 
-            if args.confusion and p_task_id == len(test_loaders) - 1:
-                true_lab_ = np.concatenate(true_lab)
-                pred_lab_ = np.concatenate(pred_lab)
-                plot_confusion(true_lab_, pred_lab_, model.seen_names,
-                                name='confusion mat task {}'.format(p_task_id),
-                                logger=args.logger, num_cls_per_task=args.num_cls_per_task)
+                if p_task_id == len(test_loaders) - 1:
+                    true_lab_ = np.concatenate(true_lab)
+                    pred_lab_ = np.concatenate(pred_lab)
+                    plot_confusion(true_lab_, pred_lab_, model.seen_names,
+                                    name='confusion mat task {}'.format(p_task_id),
+                                    logger=args.logger, num_cls_per_task=args.num_cls_per_task)
 
         args.logger.print()
         if args.compute_auc:
@@ -413,11 +506,11 @@ def train(task_list, args, train_data, test_data, model):
                         auc_softmax_tracker=auc_softmax_tracker,
                         auc_md_tracker=auc_md_tracker,
                         openworld_softmax_tracker=openworld_softmax_tracker)
-        torch.save(cil_tracker.mat, args.logger.dir() + '/cil_tracker')
-        torch.save(til_tracker.mat, args.logger.dir() + '/til_tracker')
-        torch.save(auc_softmax_tracker.mat, args.logger.dir() + '/auc_softmax_tracker')
-        torch.save(auc_md_tracker.mat, args.logger.dir() + '/auc_md_tracker')
-        torch.save(openworld_softmax_tracker.mat, args.logger.dir() + '/openworld_softmax_tracker')
+        torch.save(cil_tracker.mat, os.path.join(args.logger.dir(), 'cil_tracker'))
+        torch.save(til_tracker.mat, os.path.join(args.logger.dir(), 'til_tracker'))
+        torch.save(auc_softmax_tracker.mat, os.path.join(args.logger.dir(), 'auc_softmax_tracker'))
+        torch.save(auc_md_tracker.mat, os.path.join(args.logger.dir(), 'auc_md_tracker'))
+        torch.save(openworld_softmax_tracker.mat, os.path.join(args.logger.dir(), 'openworld_softmax_tracker'))
 
     plt.plot(cum_acc_list)
     xticks = [l[0] for l in iter_list]
@@ -426,7 +519,7 @@ def train(task_list, args, train_data, test_data, model):
     plt.xlabel('Training Time')
     plt.ylabel('Cumulative Accuracy')
     plt.title('Cumulative Accuracy over Training Time')
-    plt.savefig(args.logger.dir() + 'cumulative_acc.png')
+    plt.savefig(os.path.join(args.logger.dir(), 'cumulative_acc.png'))
     plt.close()
 
 def load_MD_stats(args, task_id):

@@ -2,6 +2,9 @@
 
 deit_pretrained
 /cifar-10-python.tar.gz
-/heavy_data/
+heavy_data
 /cifar-10-batches-py/batches.meta
 /logs/
+networks/__pycache__
+clip/__pycache__
+__pycache__

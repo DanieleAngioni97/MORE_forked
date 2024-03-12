@@ -11,7 +11,6 @@ from utils.utils import *
 from torch.utils.data import DataLoader
 from collections import Counter
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class ViTAdapter(BaseModel):
     def __init__(self, args):
@@ -62,9 +61,9 @@ class ViTAdapter(BaseModel):
                 # self.buffer_iter = iter(self.buffer)
                 inputs_bf, labels_bf = next(self.buffer_iter)
 
-            inputs_bf = inputs_bf.to(device)
+            inputs_bf = inputs_bf.to(self.args.device)
             # single dummy head
-            labels_bf = torch.zeros_like(labels_bf).to(device) + self.num_cls_per_task
+            labels_bf = torch.zeros_like(labels_bf).to(self.args.device) + self.num_cls_per_task
             normalized_labels_bf = labels_bf
             inputs = torch.cat([inputs, inputs_bf])
             labels = torch.cat([labels, labels_bf])
@@ -375,6 +374,7 @@ class ViTAdapter(BaseModel):
     def preprocess_task(self, **kwargs):
         # Add new embeddings for HAT
         self.net.append_embedddings()
+        self.net.to(self.args.device)   # the appended embeddings were in cpu...
 
         # Put label names in seen_names
         targets, names = zip(*sorted(zip(kwargs['loader'].dataset.targets,
@@ -494,7 +494,7 @@ class ViTAdapter(BaseModel):
         reg, count = 0., 0.
         if p_mask is not None:
             for m, mp in zip(masks, p_mask.values()):
-                aux = 1. - mp#.to(device)
+                aux = 1. - mp.to(self.args.device)
                 reg += (m * aux).sum()
                 count += aux.sum()
             reg /= count
@@ -516,7 +516,7 @@ class ViTAdapter(BaseModel):
         except AttributeError:
             self.net = self.net
 
-        task_id = torch.tensor([t]).to(device)
+        task_id = torch.tensor([t]).to(self.args.device)
         mask = {}
         for n, _ in self.net.named_parameters():
             names = n.split('.')

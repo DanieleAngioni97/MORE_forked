@@ -104,6 +104,7 @@ if __name__ == '__main__':
 
     args.criterion = Criterion(args, args.net)
     model = Model(args) #todo: this gives error if NOT (args.model == 'vitadapter_more' or args.model == 'deitadapter_more')
+    model.to(args.device)
 
     # This is the simplified version without 1000000 if-else options
     if args.load_dir is None:
