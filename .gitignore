@@ -1,8 +1,10 @@
 .idea
 
+nohup.out
 deit_pretrained
 /cifar-10-python.tar.gz
 heavy_data
+figures
 /cifar-10-batches-py/batches.meta
 /logs/
 networks/__pycache__

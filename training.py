@@ -152,6 +152,8 @@ def train(task_list, args, train_data, test_data, model):
             model.reset_eval()
             # orig is the original data (mostly likely numpy for CIFAR, and indices for ImageNet)
             for b, (x, y, f_y, names, orig) in tqdm(enumerate(current_train_loader)):
+                if b > 5:
+                    break
                 # for b, (x, y) in tqdm(enumerate(current_train_loader)):
                 # for simplicity, consider that we know the labels ahead
                 f_y = f_y[:, 1]
@@ -194,65 +196,6 @@ def train(task_list, args, train_data, test_data, model):
                 assert args.model == 'oe' or args.model == 'oe_fixed_minibatch'
                 out_dim, _ = param_copy.size()
                 model.net.fc.weight.data[:out_dim] = param_copy.data
-
-
-            # # If compute_md is true, obtain the features and compute/save the statistics for MD
-            # if args.compute_md:
-            #     args.logger.print("Computing Mahalanobis distance on the current training set...")
-            #     # First obtain the features
-            #     model.reset_eval()
-            #     for x, y, _, _, _ in train_loaders[-1]:
-            #         x, y = x.to(args.device), y.to(args.device)
-            #         with torch.no_grad():
-            #             if args.model_clip:
-            #                 x = args.model_clip.encode_image(x).type(torch.FloatTensor).to(args.device)
-            #             elif args.model_vit:
-            #                 x = args.model_vit.forward_features(x)
-            #             if args.zero_shot:
-            #                 text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_data.seen_names]).to(args.device)
-            #                 zeroshot.evaluate(x, text_inputs, y)
-            #         model.evaluate(x, y, task_id, report_cil=False, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
-            #     feature_list = np.concatenate(model.feature_list)
-            #     label_list = np.concatenate(model.label_list)
-            #     torch.save(feature_list,
-            #                 os.path.join(args.logger.dir(), f"feature_task_{task_id}"))
-            #     torch.save(label_list,
-            #                os.path.join(args.logger.dir(), f"label_task_{task_id}"))
-            #     cov_list = []
-            #     ys = list(sorted(set(label_list)))
-            #     # Compute/save the statistics for MD
-            #     for y in ys:
-            #         idx = np.where(label_list == y)[0]
-            #         f = feature_list[idx]
-            #         cov = np.cov(f.T)
-            #         cov_list.append(cov)
-            #         mean = np.mean(f, 0)
-            #         np.save(args.logger.dir() + f'mean_label_{y}', mean)
-            #         args.mean[y] = mean
-            #     cov = np.array(cov_list).mean(0)
-            #     np.save(args.logger.dir() + f'cov_task_{task_id}', cov)
-            #     args.cov[task_id] = cov
-            #     args.cov_inv[task_id] = np.linalg.inv(cov)
-            #     # For MD-noise
-            #     mean = np.mean(feature_list, axis=0)
-            #     np.save(args.logger.dir() + f'mean_task_{task_id}', mean)
-            #     # args.mean_task[task_id] = mean
-            #     cov = np.cov(feature_list.T)
-            #     np.save(args.logger.dir() + f'cov_task_noise_{task_id}', cov)
-            #     # args.cov_noise[task_id] = cov
-            #     # args.cov_inv_noise[task_id] = np.linalg.inv(cov)
-            #     if args.noise:
-            #         args.mean_task[task_id] = mean
-            #         args.cov_noise[task_id] = cov
-            #         args.cov_inv_noise[task_id] = np.linalg.inv(cov)
-
-            #     args.logger.print("End task...")
-            #     # End task
-            #     if hasattr(model, 'end_task'):
-            #         if args.calibration:
-            #             model.end_task(calibration_loaders, test_loaders, train_loader=train_loaders[-1])
-            #         else:
-            #             model.end_task(task_id + 1, train_loader=train_loaders[-1])
             
             ########################################################################################################
             ########################################################################################################

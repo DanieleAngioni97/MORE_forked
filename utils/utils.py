@@ -204,9 +204,13 @@ class Logger:
     def now(self):
         time = datetime.now()
         diff = time - self.init
-        self.print(time.strftime("%m|%d|%Y %H|%M|%S"), f" | Total: {diff}")
+        self.print(time.strftime("day-%d-%m-%Y_hr-%H-%M-%S"), f" | Total: {diff}")
 
-    def print(self, *object, sep=' ', end='\n', flush=False, filename='/result.txt'):
+    def print(self, *object, sep=' ', end='\n', flush=False, filename='/result.txt', date=True):
+        if date:
+            date = datetime.now().strftime("day-%d-%m-%Y_hr-%H-%M-%S")
+            date = f"{date} --- "
+            object = (date, *object)
         print(*object, sep=sep, end=end, file=sys.stdout, flush=flush)
 
         if self.args.print_filename is not None:

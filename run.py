@@ -19,8 +19,12 @@ import timm
 
 if __name__ == '__main__':
     args = parse_args()
+    args.folder = f"{args.folder}--ds-{args.dataset}--model-{args.model}"
+
+    # date = datetime.now().strftime("day-%d-%m-%Y_hr-%H-%M-%S")
+    # args.folder = f"{date}--{args.folder}"
+
     args.logger = Logger(args, args.folder)
-    args.logger.now()
 
     args.device = f"cuda:{args.cuda_id}" if torch.cuda.is_available() else "cpu"
 
@@ -90,7 +94,9 @@ if __name__ == '__main__':
                                num_classes=num_classes,
                                latent=args.adapter_latent,
                                args=args)
-        args.net.to(args.device)
+        # from networks.resnet_hat import ResNet18
+        # args.net = ResNet18(args, num_classes=10)
+        # args.net.to(args.device)
         
         if args.distillation:
             teacher = timm.create_model(model_type, pretrained=False, num_classes=num_classes).cuda()

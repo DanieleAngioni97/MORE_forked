@@ -80,7 +80,7 @@ def test(task_list, args, train_data, test_data, model):
             args.logger.print("Load a trained model from:")
             args.logger.print(filename)
             state_dict = torch.load(filename)          
-            model.net.load_state_dict(state_dict)
+            model.net.load_state_dict(state_dict)   # Load the model trained up to task <task_id>
 
             if args.train_clf_id is not None:
                 if task_id <= args.train_clf_id:
@@ -101,8 +101,8 @@ def test(task_list, args, train_data, test_data, model):
             raise NotImplementedError(args.load_dir + '/' + test_model_name + str(task_id), "Load dir incorrect")
 
         # Load statistics for MD
-        if os.path.exists(args.load_dir + f'/cov_task_{task_id}.npy'):
-            args.compute_md = True
+        if args.use_md and os.path.exists(args.load_dir + f'/cov_task_{task_id}.npy'):
+            # args.compute_md = True
             args.logger.print("*** Load Statistics for MD ***")
             cov = np.load(args.load_dir + f'/cov_task_{task_id}.npy')
             args.cov[task_id] = cov
@@ -158,7 +158,7 @@ def test(task_list, args, train_data, test_data, model):
         cal_cil_tracker.update(metrics['cal_cil_acc'], task_id, task_id)
 
         if args.compute_auc:
-            in_scores = metrics['scores']
+            in_scores = metrics['scores']   # NB: THIS IS THE SCORE OF THE CORRECT HEAD, WE NEED SCORES_TOTAL
             if args.compute_md: in_scores_md = metrics['scores_md']
             auc_list, auc_list_md = [], []
             auc_total_in_list, auc_total_out_list, out_id_list = [metrics['scores_total']], [], []
@@ -179,7 +179,7 @@ def test(task_list, args, train_data, test_data, model):
                         cil_tracker.update(metrics['cil_acc'], task_id, task_out)
                         til_tracker.update(metrics['til_acc'], task_id, task_out)
 
-                    out_scores = metrics['scores']
+                    out_scores = metrics['scores']  # DO NOT TRUST THIS
                     auc = compute_auc(in_scores, out_scores)
                     auc_list.append(auc * 100)
                     args.logger.print("in/out: {}/{} | Softmax AUC: {:.2f}".format(task_id, task_out, auc_list[-1]), end=' ')
@@ -208,6 +208,7 @@ def test(task_list, args, train_data, test_data, model):
                 args.logger.print("total in/out: {}/{} | AUC: {:.2f}".format(task_id, task_out, auc * 100))
                 openworld_softmax_tracker.update(auc * 100, task_id, task_out)
             if len(auc_total_in_list) > 0 and len(auc_total_out_list) > 0:
+                # TODO: THIS IS WHAT WE NEED FOR CIL OOD DETECTION!!!
                 auc = compute_auc(auc_total_in_list, auc_total_out_list)
                 args.logger.print("total in | AUC: {:.2f}".format(auc * 100))
 
