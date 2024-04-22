@@ -221,14 +221,17 @@ class Adapter(nn.Module):
         self.init_weights()
 
     def forward(self, t, x, msk, s):
-        masks = self.mask(t, s=s)
-        gc1, gc2 = masks
+        if t is not None:
+            masks = self.mask(t, s=s)
+            gc1, gc2 = masks
 
-        msk.append(masks)
+            msk.append(masks)
 
-        h = self.relu(self.mask_out(self.fc1(x), gc1))
-        h = self.mask_out(self.fc2(h), gc2)
-        return x + h, msk
+            h = self.relu(self.mask_out(self.fc1(x), gc1))
+            h = self.mask_out(self.fc2(h), gc2)
+            return x + h, msk
+        else:
+            return x, msk
 
     def init_weights(self):
         for n, p in self.named_parameters():
@@ -355,6 +358,7 @@ class MyVisionTransformer(nn.Module):
 
         # Classifier head(s)
         self.head = nn.ModuleList()
+        self.heads_compact = None
         self.head_dist = None
         if distilled:
             self.head_dist = nn.Linear(self.embed_dim, self.num_classes) if num_classes > 0 else nn.Identity()
@@ -426,16 +430,7 @@ class MyVisionTransformer(nn.Module):
 
     def forward(self, t, x, s):
         x, msk = self.forward_features(t, x, s=s)
-        if self.head_dist is not None:
-            raise NotImplementedError("head_dist is not implemented")
-            x, x_dist = self.head(x[0]), self.head_dist(x[1])  # x must be a tuple
-            if self.training and not torch.jit.is_scripting():
-                # during inference, return the average of both classifier predictions
-                return x, x_dist
-            else:
-                return (x + x_dist) / 2
-        else:
-            x = self.head[t](x)
+        x = self.forward_classifier(t, x)
         return x, msk
 
     def forward_classifier(self, t, x):
@@ -449,6 +444,8 @@ class MyVisionTransformer(nn.Module):
         else:
             x = self.head[t](x)
         return x
+
+
 
     def append_embedddings(self):
         # append head

@@ -143,6 +143,8 @@ def test(task_list, args, train_data, test_data, model):
         if args.train_clf_id is not None:
             if task_id <= args.train_clf_id:
                 continue
+
+        # IN-DISTRIBUTION evaluation    # EDIT added a comment
         for x, y, _, _, _ in test_loaders[-1]: # THIS NEEDS TO BE CHANGE (FROM TEST TO TRAINLOADER) WHEN SAVING FEATURES
             x, y = x.to(args.device), y.to(args.device)
             with torch.no_grad():
@@ -157,6 +159,7 @@ def test(task_list, args, train_data, test_data, model):
         til_tracker.update(metrics['til_acc'], task_id, task_id)
         cal_cil_tracker.update(metrics['cal_cil_acc'], task_id, task_id)
 
+        # OOD classes evaluation         # EDIT added a comment
         if args.compute_auc:
             in_scores = metrics['scores']   # NB: THIS IS THE SCORE OF THE CORRECT HEAD, WE NEED SCORES_TOTAL
             if args.compute_md: in_scores_md = metrics['scores_md']
@@ -235,9 +238,10 @@ def test(task_list, args, train_data, test_data, model):
             cal_cil_tracker.print_result(task_id, type='acc')
             cal_cil_tracker.print_result(task_id, type='forget')
 
-        torch.save(cil_tracker.mat, args.logger.dir() + '/cil_tracker_train_clf_equal_test')
-        torch.save(til_tracker.mat, args.logger.dir() + '/til_tracker_train_clf_equal_test')
-        torch.save(auc_softmax_tracker.mat, args.logger.dir() + '/auc_softmax_tracker_train_clf_equal_test')
-        torch.save(openworld_softmax_tracker.mat, args.logger.dir() + '/openworld_softmax_tracker_train_clf_equal_test')
+        tracker_path = os.path.join(args.logger.dir(), 'trackers')
+        torch.save(cil_tracker, os.path.join(tracker_path, '/cil_tracker_train_clf_equal_test'))
+        torch.save(til_tracker, os.path.join(tracker_path, '/til_tracker_train_clf_equal_test'))
+        torch.save(auc_softmax_tracker, os.path.join(tracker_path, '/auc_softmax_tracker_train_clf_equal_test'))
+        torch.save(openworld_softmax_tracker, os.path.join(tracker_path, '/openworld_softmax_tracker_train_clf_equal_test'))
 
     return cil_tracker.mat, til_tracker.mat, cal_cil_tracker.mat

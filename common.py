@@ -66,6 +66,8 @@ def parse_args():
     parser.add_argument('--task_type', type=str, default='standardCL_randomcls',
                             choices=['cov', 'concept', 'pre-define',
                                      'standardCL_supercls', 'standardCL_randomcls'], help='learning scenarios')
+    parser.add_argument('--farood_det', action='store_true')            # EDIT: added parameter
+    parser.add_argument('--farood_data', type=str, default='mnist', help="choose a dataset very different from the dataset")        # EDIT: added argument
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--init_task', type=int, default=0)
     parser.add_argument('--n_tasks', type=int, default=5)
@@ -173,6 +175,9 @@ def parse_args():
     parser.add_argument('--hlr', type=float, default=0.5)
 
     # For vitadapter + OOD approaches
+    parser.add_argument('--my_ood_det', action='store_true')                # EDIT: (new param) testing OOD det without buffer
+    parser.add_argument('--ood_det', type=str, default='msp', choices=['msp', 'react', 'ash', 'scale', 'dice'])     # EDIT? don't know if it's actually used
+    parser.add_argument('--compute_auc', action='store_true')
     parser.add_argument('--compute_auc', action='store_true')
     parser.add_argument('--calibration', action='store_true')
     parser.add_argument('--use_md', action='store_true', help='use MD value for CIL prediction')

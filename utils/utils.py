@@ -189,13 +189,14 @@ class Zeroshot:
         self.correct, self.total, self.total_loss = 0., 0., 0.
 
 class Logger:
-    def __init__(self, args, name=None):
+    def __init__(self, args, name=None, filename='result'):
         self.init = datetime.now()
         self.args = args
         if name is None:
             self.name = self.init.strftime("%m|%d|%Y %H|%M|%S")
         else:
             self.name = name
+        self.filename = f"/{filename}.txt"
 
         self.args.dir = self.name
 
@@ -206,7 +207,9 @@ class Logger:
         diff = time - self.init
         self.print(time.strftime("day-%d-%m-%Y_hr-%H-%M-%S"), f" | Total: {diff}")
 
-    def print(self, *object, sep=' ', end='\n', flush=False, filename='/result.txt', date=True):
+    def print(self, *object, sep=' ', end='\n', flush=False, filename=None, date=True):
+        if filename is None:
+            filename = self.filename
         if date:
             date = datetime.now().strftime("day-%d-%m-%Y_hr-%H-%M-%S")
             date = f"{date} --- "
@@ -238,6 +241,40 @@ class Logger:
     def time_interval(self):
         self.print("Total time spent: {}".format(datetime.now() - self.init))
 
+def _print_results(task_id, mat, print=print, type='acc'):
+    if type == 'acc':
+        # Print accuracy
+        print(f'> Accuracy', date=False)
+        for i in range(task_id + 1):
+            print(f"Trained on task {i} -> [", end='', date=False)
+            for j in range(task_id + 1):
+                acc = mat[i, j]
+                if acc != -100:
+                    print("{:.2f}   /".format(acc), end='', date=False)
+                else:
+                    print("\t", end='', date=False)
+            print("]    ", end='', date=False)
+            print(f"ACA(t={i})={mat[i, -1]:.2f}", date=False)
+        print(f"> AIA: {mat[-1, -1]:.2f}", date=False)
+    elif type == 'forget':
+        print('> Forgetting:', date=False)
+        print("[", end='', date=False)
+        # Print forgetting and average incremental accuracy
+        for i in range(task_id + 1):
+            forgetting_i = mat[-1, i]
+            if forgetting_i != -100:
+                print(f"{forgetting_i:.2f}  /", end='', date=False)
+            else:
+                print("\t", end='', date=False)
+        print("]", end='', date=False)
+        if task_id > 0:
+            forget = np.mean(mat[-1, :task_id])
+            print(f"Avg Forgetting: {forget:.2f}", date=False)
+    else:
+        raise NotImplementedError("Type must be either 'acc' or 'forget'")
+
+
+
 class Tracker:
     def __init__(self, args):
         self.print = args.logger.print
@@ -262,31 +299,40 @@ class Tracker:
         self.mat[-1, -1] = np.mean(self.mat[:task_id + 1, -1])
 
     def print_result(self, task_id, type='acc', print=None):
-        if print is None: print = self.print
-        if type == 'acc':
-            # Print accuracy
-            for i in range(task_id + 1):
-                for j in range(task_id + 1):
-                    acc = self.mat[i, j]
-                    if acc != -100:
-                        print("{:.2f}\t".format(acc), end='')
-                    else:
-                        print("\t", end='')
-                print("{:.2f}".format(self.mat[i, -1]))
-        elif type == 'forget':
-            # Print forgetting and average incremental accuracy
-            for i in range(task_id + 1):
-                acc = self.mat[-1, i]
-                if acc != -100:
-                    print("{:.2f}\t".format(acc), end='')
-                else:
-                    print("\t", end='')
-            print("{:.2f}".format(self.mat[-1, -1]))
-            if task_id > 0:
-                forget = np.mean(self.mat[-1, :task_id])
-                print("{:.2f}".format(forget))
-        else:
-            raise NotImplementedError("Type must be either 'acc' or 'forget'")
+        if self.print:
+            print = self.print
+        _print_results(task_id=task_id, mat=self.mat, print=print, type=type)
+        # if print is None: print = self.print
+        # if type == 'acc':
+        #     # Print accuracy
+        #     print(f'> Accuracy', date=False)
+        #     for i in range(task_id + 1):
+        #         print(f"Trained on task {task_id} -> [", end='', date=False)
+        #         for j in range(task_id + 1):
+        #             acc = self.mat[i, j]
+        #             if acc != -100:
+        #                 print("{:.2f}   /".format(acc), end='', date=False)
+        #             else:
+        #                 print("\t", end='', date=False)
+        #         print("]    ", end='', date=False)
+        #         print(f"ACA(t={task_id})={self.mat[i, -1]:.2f}", date=False)
+        #     print(f"> AIA: {self.mat[-1, -1]:.2f}", date=False)
+        # elif type == 'forget':
+        #     print('> Forgetting:', date=False)
+        #     print("[", end='', date=False)
+        #     # Print forgetting and average incremental accuracy
+        #     for i in range(task_id + 1):
+        #         forgetting_i = self.mat[-1, i]
+        #         if forgetting_i != -100:
+        #             print(f"{forgetting_i:.2f}  /", end='', date=False)
+        #         else:
+        #             print("\t", end='', date=False)
+        #         print("]", end='', date=False)
+        #     if task_id > 0:
+        #         forget = np.mean(self.mat[-1, :task_id])
+        #         print(f"Avg Forgetting: {forget:.2f}", date=False)
+        # else:
+        #     raise NotImplementedError("Type must be either 'acc' or 'forget'")
 
 class AUCTracker:
     def __init__(self, args):
@@ -354,8 +400,7 @@ class OWTracker:
         # Compute average incremental accuracy
         self.mat[-1, -1] = np.mean(self.mat[:task_id + 1, -1])
 
-    def print_result(self, task_id, type='acc', print=None):
-        if print is None: print = self.print
+    def print_result(self, task_id, type='acc', print=print):
         if type == 'acc':
             # Print accuracy
             for i in range(task_id + 1):
@@ -376,31 +421,31 @@ class OWTracker:
         else:
             raise NotImplementedError("Type must be 'acc'")
 
-def print_result(mat, task_id, type, print=print):
-    if type == 'acc':
-        # Print accuracy
-        for i in range(task_id + 1):
-            for j in range(task_id + 1):
-                acc = mat[i, j]
-                if acc != -100:
-                    print("{:.2f}\t".format(acc), end='')
-                else:
-                    print("\t", end='')
-            print("{:.2f}".format(mat[i, -1]))
-    elif type == 'forget':
-        # Print forgetting and average incremental accuracy
-        for i in range(task_id + 1):
-            acc = mat[-1, i]
-            if acc != -100:
-                print("{:.2f}\t".format(acc), end='')
-            else:
-                print("\t", end='')
-        print("{:.2f}".format(mat[-1, -1]))
-        if task_id > 0:
-            forget = np.mean(mat[-1, :task_id])
-            print("Average Forgetting: {:.2f}".format(forget))
-    else:
-        ValueError("Type must be either 'acc' or 'forget'")
+# def print_result(mat, task_id, type, print=print):
+#     if type == 'acc':
+#         # Print accuracy
+#         for i in range(task_id + 1):
+#             for j in range(task_id + 1):
+#                 acc = mat[i, j]
+#                 if acc != -100:
+#                     print("{:.2f}\t".format(acc), end='')
+#                 else:
+#                     print("\t", end='')
+#             print("{:.2f}".format(mat[i, -1]))
+#     elif type == 'forget':
+#         # Print forgetting and average incremental accuracy
+#         for i in range(task_id + 1):
+#             acc = mat[-1, i]
+#             if acc != -100:
+#                 print("{:.2f}\t".format(acc), end='')
+#             else:
+#                 print("\t", end='')
+#         print("{:.2f}".format(mat[-1, -1]))
+#         if task_id > 0:
+#             forget = np.mean(mat[-1, :task_id])
+#             print("Average Forgetting: {:.2f}".format(forget))
+#     else:
+#         ValueError("Type must be either 'acc' or 'forget'")
 
 def tsne(train_f_cross, train_y_cross, name='tsne',
          n_components=2, verbose=0, learning_rate=1, perplexity=9, n_iter=1000, logger=None):

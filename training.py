@@ -51,6 +51,7 @@ def train(task_list, args, train_data, test_data, model):
     ########################################################################################################
     ########################################################################################################
     for task_id in range(len(task_list)):
+        # task_id = 0 --> ['airplane', 'automobile'], len(t_train) = 10000, len(t_test) = 2000      # EDIT: informatory comment
         task_loss_list = []
 
         if args.validation is None:
@@ -152,8 +153,8 @@ def train(task_list, args, train_data, test_data, model):
             model.reset_eval()
             # orig is the original data (mostly likely numpy for CIFAR, and indices for ImageNet)
             for b, (x, y, f_y, names, orig) in tqdm(enumerate(current_train_loader)):
-                if b > 5:
-                    break
+                # if b > 5:
+                #     break
                 # for b, (x, y) in tqdm(enumerate(current_train_loader)):
                 # for simplicity, consider that we know the labels ahead
                 f_y = f_y[:, 1]
@@ -423,15 +424,17 @@ def train(task_list, args, train_data, test_data, model):
             args.logger.print("Softmax AUC result")
             auc_softmax_tracker.print_result(task_id, type='acc')
             args.logger.print("Open World result")
-            openworld_softmax_tracker.print_result(task_id, type='acc')
+            openworld_softmax_tracker.print_result(task_id, type='acc') # EDIT: the result is not acc, but auc score
         if args.compute_md:
             args.logger.print("MD AUC result")
             auc_md_tracker.print_result(task_id, type='acc')
-        args.logger.print("CIL result")
+        args.logger.print("CIL result acc")
         cil_tracker.print_result(task_id, type='acc')
+        args.logger.print("CIL result forget")
         cil_tracker.print_result(task_id, type='forget')
-        args.logger.print("TIL result")
+        args.logger.print("TIL result acc")
         til_tracker.print_result(task_id, type='acc')
+        args.logger.print("TIL result forget")
         til_tracker.print_result(task_id, type='forget')
         args.logger.print()
 

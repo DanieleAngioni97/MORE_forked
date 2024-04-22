@@ -40,6 +40,12 @@ if __name__ == '__main__':
     # LOAD DATASET
     #################################################
     train_data, test_data = get_data(args)
+
+    # adding a condition to grab far ood data
+    if args.farood_det:
+        assert args.dataset != args.farood_data
+        farood_data = get_ood_data(args)
+    
     if args.task_type == 'standardCL_randomcls':
         task_list = generate_random_cl(args)
         train_data = StandardCL(train_data, args, task_list)
@@ -124,11 +130,31 @@ if __name__ == '__main__':
             args.train = True
             from train_clf import train
             train(task_list, args, train_data, test_data, model)
+        # elif args.calibration and not args.train_clf and not args.obtain_val_outputs and not args.obtain_val_outputs_comp and not args.train_ebd:
+        #     args.train = True
+        #     from train_calibration import train
+        #     train(task_list, args, train_data, test_data, model)
+        # elif args.train_ebd:
+        #     args.train = True
+        #     from train_ebd import train
+        #     train(task_list, args, train_data, test_data, model)
+        # elif args.obtain_val_outputs:
+        #     from save_val_outputs import test
+        #     test(task_list, args, train_data, test_data, model)
+        # elif args.obtain_val_outputs_comp:
+        #     from val_output_comp import test
+        #     test(task_list, args, train_data, test_data, model)
+        elif args.my_ood_det:                                           # EDIT: testing OOD det without buffer
+            from my_test_ood import test_ood_detectors                  # EDIT: testing OOD det without buffer
+            test_ood_detectors(task_list, args, test_data, model, args.ood_det)       # EDIT: testing OOD det without buffer
         else:
             # THIS IS THE TEST_ONLY PART
             args.train = False
             from testing import test
-            test(task_list, args, train_data, test_data, model)
+            if args.farood_det:                                         # EDIT: testing for the far_ood dataset
+                test(task_list, args, train_data, farood_data, model)   # EDIT: testing for the far_ood dataset
+            else:
+                test(task_list, args, train_data, test_data, model)
 
 
     # todo: teacher_net unreferenced, and 'clipadapter_hat appear in both two if statements

@@ -266,9 +266,12 @@ def train(task_list, args, train_data, test_data, model):
         torch.save(til_tracker.mat, args.logger.dir() + '/til_tracker_train_clf_equal')
 
     plt.plot(cum_acc_list)
-    xticks = [l[0] for l in iter_list]
-    xticks.append(iter_list[-1][-2])
-    plt.xticks(xticks)
+    try:
+        xticks = [l[0] for l in iter_list]
+        xticks.append(iter_list[-1][-2])
+        plt.xticks(xticks)
+    except:
+        print("Error in xticks, skipping...")
     plt.xlabel('Training Time')
     plt.ylabel('Cumulative Accuracy')
     plt.title('Cumulative Accuracy over Training Time')

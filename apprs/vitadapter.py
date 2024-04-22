@@ -10,7 +10,9 @@ from copy import deepcopy
 from utils.utils import *
 from torch.utils.data import DataLoader
 from collections import Counter
-
+from ood_networks.ash_net import ASHNet
+from ood_networks.react_net import ReactNet
+from ood_networks.scale_net import ScaleNet
 
 class ViTAdapter(BaseModel):
     def __init__(self, args):
@@ -217,6 +219,8 @@ class ViTAdapter(BaseModel):
         if report_cil:
             with torch.no_grad():
                 entropy_list = []
+                # Loop all the heads
+                # features, _ = self.net.forward_features(None, inputs, s=self.args.smax)
                 for t in range(total_learned_task_id + 1):
                     features, _ = self.net.forward_features(t, inputs, s=self.args.smax)
                     out = self.net.forward_classifier(t, features)
@@ -606,3 +610,61 @@ class ViTAdapter(BaseModel):
                 elif 'fc2.bias' in n:
                     mask_back[n] = 1 - p_mask['.'.join(names[:-2]) + '.ec2'].view(-1)
         return mask_back
+
+    # EDIT: added function to wrap the network
+    def ood_wrapped_net(self, postprocessor):
+        
+        if postprocessor == 'react':
+            self.net = ReactNet(self.net)
+        elif postprocessor == 'ash':
+            self.net = ASHNet(self.net)
+        elif postprocessor == 'scale':
+            self.net = ScaleNet(self.net)
+        else:
+            self.net = self.net
+
+    # EDIT: added function for msp
+    def get_softmax_performance(self, loader, t):
+
+        activation_list, pred_list, conf_list, lab_list = [], [], [], []
+
+        for inp, lab, _, _, _ in loader:
+            inp, lab = inp.to(device), lab.to(device)
+            
+
+            with torch.no_grad():
+                self.net.eval()
+                features, _ =  self.net.forward_features(t, inp, s=self.args.smax)
+                output = self.net.forward_classifier(t, features)
+                softmax_scores = torch.softmax(output, dim = 1)
+                pred, conf = torch.max(softmax_scores, dim = 1)
+
+                activation_list.append(output.to(device))
+                pred_list.append(pred.to(device))
+                conf_list.append(conf.to(device))
+                lab_list.append(lab.to(device))
+
+
+        pred_list = torch.cat(pred_list).numpy().astype(int)
+        conf_list = torch.cat(conf_list).numpy()
+        lab_list = torch.cat(lab_list).numpy().astype(int)
+
+        return(activation_list, pred_list, conf_list, lab_list)
+    
+    # EDIT: added function
+    def ood_scale(self, loader, t, threshold):
+
+        for inp, lab, _, _, _ in loader:
+            inp, lab = inp.to(device), lab.to(device)
+            self.net.eval()
+
+            with torch.no_grad():
+                features, _ =  self.net.forward_features(t, inp, s=self.args.smax)
+                features = features.clip(max=threshold)
+                features = features.view(features.size(0), -1)
+                logit_cls = self.forward_classifier(features)
+
+        pass
+
+    def ood_react():
+        pass
