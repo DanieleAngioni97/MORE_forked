@@ -178,7 +178,6 @@ def parse_args():
     parser.add_argument('--my_ood_det', action='store_true')                # EDIT: (new param) testing OOD det without buffer
     parser.add_argument('--ood_det', type=str, default='msp', choices=['msp', 'react', 'ash', 'scale', 'dice'])     # EDIT? don't know if it's actually used
     parser.add_argument('--compute_auc', action='store_true')
-    parser.add_argument('--compute_auc', action='store_true')
     parser.add_argument('--calibration', action='store_true')
     parser.add_argument('--use_md', action='store_true', help='use MD value for CIL prediction')
     parser.add_argument('--noise', action='store_true', help='use MD-noise')

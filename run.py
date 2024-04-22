@@ -19,7 +19,7 @@ import timm
 
 if __name__ == '__main__':
     args = parse_args()
-    args.folder = f"{args.folder}--ds-{args.dataset}--model-{args.model}"
+    # args.folder = f"{args.folder}--ds-{args.dataset}--model-{args.model}"
 
     # date = datetime.now().strftime("day-%d-%m-%Y_hr-%H-%M-%S")
     # args.folder = f"{date}--{args.folder}"
@@ -41,16 +41,16 @@ if __name__ == '__main__':
     #################################################
     train_data, test_data = get_data(args)
 
-    # adding a condition to grab far ood data
-    if args.farood_det:
-        assert args.dataset != args.farood_data
-        farood_data = get_ood_data(args)
-    
     if args.task_type == 'standardCL_randomcls':
         task_list = generate_random_cl(args)
         train_data = StandardCL(train_data, args, task_list)
         test_data = StandardCL(test_data, args, task_list)
-
+        # adding a condition to grab far ood data
+        if args.farood_det:
+            assert args.dataset != args.farood_data
+            farood_data = get_ood_data(args)
+            farood_data = StandardCL(farood_data, args, task_list)
+    
     # Obtain the list of unique labels from all tasks
     args.sup_labels = []
     for task in task_list:

@@ -264,6 +264,7 @@ def get_data(args):
     """
     train_transform, test_transform = augmentations(args)
     dataset_root_path = 'heavy_data/datasets'
+    os.makedirs(dataset_root_path, exist_ok=True)
 
     if args.dataset == 'mnist':
         train = MNIST(root=dataset_root_path, train=True, download=True, transform=train_transform)
@@ -294,20 +295,22 @@ def get_data(args):
 
 # EDIT: adding function to get far ood data for testing
 def get_ood_data(args):
+    dataset_root_path = 'heavy_data/datasets'
+    os.makedirs(dataset_root_path, exist_ok=True)
     # assigning same transformation to farood as test_transform
     _, farood_transform = augmentations(args)
     args.root = './'
     if args.farood_det:
         if args.farood_data == "mnist":
-            farood_test = MNIST(root=args.root, train=False, download=True, transform=farood_transform)
+            farood_test = MNIST(root=dataset_root_path, train=False, download=True, transform=farood_transform)
         elif args.farood_data == "cifar100":
-            farood_test = CIFAR100(root=args.root, train=False, download=True, transform=farood_transform)
+            farood_test = CIFAR100(root=dataset_root_path, train=False, download=True, transform=farood_transform)
         elif args.farood_data == "cifar10":
-            farood_test = CIFAR10(root=args.root, train=False, download=True, transform=farood_transform)  
+            farood_test = CIFAR10(root=dataset_root_path, train=False, download=True, transform=farood_transform)  
         elif args.farood_data == 'imagenet':
-            farood_test = ImageFolder(root=args.root + '/ImageNet/val', transform=farood_transform)
+            farood_test = ImageFolder(root=dataset_root_path + '/ImageNet/val', transform=farood_transform)
         elif args.farood_data == 'timgnet':
-            farood_test = ImageFolder(root=args.root + '/TinyImagenet/val_folders', transform=farood_transform)
+            farood_test = ImageFolder(root=dataset_root_path + '/TinyImagenet/val_folders', transform=farood_transform)
 
     
     farood_test = ClassSplit(args).relabel(farood_test)
