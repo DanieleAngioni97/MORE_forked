@@ -45,30 +45,44 @@ def test(task_list, args, train_data, test_data, model):
 
     if args.task_type == 'concept': if_shift = []
 
+
+
+
+
+    #################################################
+    # TASK ID LOOP
+    #################################################
+    preloop_previous_tasks = None   # EDIT: this is to add all heads in one take if one wants to start with task_id > 0
     for task_id in range(args.load_task_id + 1):
+        task_id = 3     # EDIT: added for debug
         task_loss_list = []
 
-        if args.validation is None:
-            t_train = train_data.make_dataset(task_id)
-            t_test = test_data.make_dataset(task_id)
-        else:
-            t_train, t_test = train_data.make_dataset(task_id)
+        if preloop_previous_tasks is None:
+            preloop_previous_tasks = (task_id != 0)    # EDIT: this is set only the first time
+        start_task = 0 if preloop_previous_tasks else task_id
+        for i in range(start_task, task_id + 1):
+            if args.validation is None:
+                t_train = train_data.make_dataset(i)
+                t_test = test_data.make_dataset(i)
+            else:
+                t_train, t_test = train_data.make_dataset(i)
 
-        if args.calibration:
-            assert args.cal_batch_size > 0
-            assert args.cal_epochs > 0
-            assert args.cal_size > 0
-            t_train, t_cal = calibration_dataset(args, t_train)
-            calibration_loaders.append(make_loader(t_cal, args, train='calibration'))
+            if args.calibration:
+                assert args.cal_batch_size > 0
+                assert args.cal_epochs > 0
+                assert args.cal_size > 0
+                t_train, t_cal = calibration_dataset(args, t_train)
+                calibration_loaders.append(make_loader(t_cal, args, train='calibration'))
 
-        train_loaders.append(make_loader(t_train, args, train='train'))
-        test_loaders.append(make_loader(t_test, args, train='test'))
+            train_loaders.append(make_loader(t_train, args, train='train'))
+            test_loaders.append(make_loader(t_test, args, train='test'))
 
-        if hasattr(model, 'preprocess_task'):
-            model.preprocess_task(names=train_data.task_list[task_id][0],
-                                  labels=train_data.task_list[task_id][1],
-                                  task_id=task_id,
-                                  loader=train_loaders[-1])
+            if hasattr(model, 'preprocess_task'):
+                model.preprocess_task(names=train_data.task_list[i][0],
+                                        labels=train_data.task_list[i][1],
+                                        task_id=i,
+                                        loader=train_loaders[-1])
+        preloop_previous_tasks = False
 
         # Load model
         if args.test_model_name is None:
@@ -144,7 +158,11 @@ def test(task_list, args, train_data, test_data, model):
             if task_id <= args.train_clf_id:
                 continue
 
-        # IN-DISTRIBUTION evaluation    # EDIT added a comment
+
+
+        #################################################
+        # IN-DISTRIBUTION evaluation
+        #################################################
         for x, y, _, _, _ in test_loaders[-1]: # THIS NEEDS TO BE CHANGE (FROM TEST TO TRAINLOADER) WHEN SAVING FEATURES
             x, y = x.to(args.device), y.to(args.device)
             with torch.no_grad():
@@ -159,7 +177,10 @@ def test(task_list, args, train_data, test_data, model):
         til_tracker.update(metrics['til_acc'], task_id, task_id)
         cal_cil_tracker.update(metrics['cal_cil_acc'], task_id, task_id)
 
-        # OOD classes evaluation         # EDIT added a comment
+
+        #################################################
+        # OOD classes evaluation   
+        #################################################
         if args.compute_auc:
             in_scores = metrics['scores']   # NB: THIS IS THE SCORE OF THE CORRECT HEAD, WE NEED SCORES_TOTAL
             if args.compute_md: in_scores_md = metrics['scores_md']
