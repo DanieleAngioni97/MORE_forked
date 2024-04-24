@@ -53,66 +53,37 @@ def test(task_list, args, train_data, test_data, model):
     # TASK ID LOOP
     #################################################
     preloop_previous_tasks = None   # EDIT: this is to add all heads in one take if one wants to start with task_id > 0
-    for task_id in range(args.load_task_id + 1):
-        task_id = 3     # EDIT: added for debug
+    start_task_outer = 3 # EDIT: added for debug
+    for task_id in range(args.load_task_id + 1):   
         task_loss_list = []
 
-        if preloop_previous_tasks is None:
-            preloop_previous_tasks = (task_id != 0)    # EDIT: this is set only the first time
-        start_task = 0 if preloop_previous_tasks else task_id
-        for i in range(start_task, task_id + 1):
-            if args.validation is None:
-                t_train = train_data.make_dataset(i)
-                t_test = test_data.make_dataset(i)
-            else:
-                t_train, t_test = train_data.make_dataset(i)
-
-            if args.calibration:
-                assert args.cal_batch_size > 0
-                assert args.cal_epochs > 0
-                assert args.cal_size > 0
-                t_train, t_cal = calibration_dataset(args, t_train)
-                calibration_loaders.append(make_loader(t_cal, args, train='calibration'))
-
-            train_loaders.append(make_loader(t_train, args, train='train'))
-            test_loaders.append(make_loader(t_test, args, train='test'))
-
-            if hasattr(model, 'preprocess_task'):
-                model.preprocess_task(names=train_data.task_list[i][0],
-                                        labels=train_data.task_list[i][1],
-                                        task_id=i,
-                                        loader=train_loaders[-1])
-        preloop_previous_tasks = False
-
-        # Load model
-        if args.test_model_name is None:
-            test_model_name = 'model_task_'
+        # if preloop_previous_tasks is None:
+        #     preloop_previous_tasks = (task_id != 0)    # EDIT: this is set only the first time
+        # start_task_inner = 0 if preloop_previous_tasks else task_id
+        # for i in range(start_task_inner, task_id + 1):
+        i = task_id
+        if args.validation is None:
+            t_train = train_data.make_dataset(i)
+            t_test = test_data.make_dataset(i)
         else:
-            test_model_name = args.test_model_name
-        if os.path.exists(args.load_dir + '/' + test_model_name + str(task_id)):
-            filename = args.load_dir + '/' + test_model_name + str(task_id)
-            args.logger.print("Load a trained model from:")
-            args.logger.print(filename)
-            state_dict = torch.load(filename)          
-            model.net.load_state_dict(state_dict)   # Load the model trained up to task <task_id>
+            t_train, t_test = train_data.make_dataset(i)
 
-            if args.train_clf_id is not None:
-                if task_id <= args.train_clf_id:
-                    filename = args.load_dir + '/' + f'model_task_clf_epoch=10_{task_id}'
-                else:
-                    filename = args.load_dir + '/' + f'model_task_clf_epoch=10_{args.train_clf_id}'
-                filename = torch.load(filename)
+        if args.calibration:
+            assert args.cal_batch_size > 0
+            assert args.cal_epochs > 0
+            assert args.cal_size > 0
+            t_train, t_cal = calibration_dataset(args, t_train)
+            calibration_loaders.append(make_loader(t_cal, args, train='calibration'))
 
-                for n, p in model.net.named_parameters():
-                    if 'head' in n:
-                        if n in filename.keys():
-                            args.logger.print("changed head:", n)
-                            print('before', torch.sum(p), torch.sum(filename[n]))
-                            p.data = filename[n].data
-                            print('after', torch.sum(p), torch.sum(filename[n]))
+        train_loaders.append(make_loader(t_train, args, train='train'))
+        test_loaders.append(make_loader(t_test, args, train='test'))
 
-        else:
-            raise NotImplementedError(args.load_dir + '/' + test_model_name + str(task_id), "Load dir incorrect")
+        if hasattr(model, 'preprocess_task'):
+            model.preprocess_task(names=train_data.task_list[i][0],
+                                    labels=train_data.task_list[i][1],
+                                    task_id=i,
+                                    loader=train_loaders[-1])
+        # preloop_previous_tasks = False
 
         # Load statistics for MD
         if args.use_md and os.path.exists(args.load_dir + f'/cov_task_{task_id}.npy'):
@@ -132,7 +103,41 @@ def test(task_list, args, train_data, test_data, model):
                 args.mean[y] = mean
         else:
             args.logger.print("*** No MD ***")
+        
+        # if task_id < start_task_outer:
+        #     continue
 
+        # Load model
+        if args.test_model_name is None:
+            test_model_name = 'model_task_'
+        else:
+            test_model_name = args.test_model_name
+        if os.path.exists(args.load_dir + '/' + test_model_name + str(task_id)):
+            filename = args.load_dir + '/' + test_model_name + str(task_id)
+            args.logger.print("Load a trained model from:")
+            args.logger.print(filename)
+            state_dict = torch.load(filename)          
+            model.net.load_state_dict(state_dict)   # Load the model trained up to task <task_id>
+
+            if args.train_clf_id is not None:
+                if task_id <= args.train_clf_id:
+                    filename = args.load_dir + '/' + f'model_task_clf_epoch=10_{task_id}'
+                else:
+                    filename = args.load_dir + '/' + f'model_task_clf_epoch=10_{args.train_clf_id}'
+                backupdated_model = torch.load(filename)
+
+                for n, p in model.net.named_parameters():
+                    if 'head' in n:
+                        if n in backupdated_model.keys():
+                            args.logger.print("changed head:", n)
+                            print('before', p.abs().sum(), backupdated_model[n].abs().sum())
+                            p.data = backupdated_model[n].data
+                            print('after', p.abs().sum(), backupdated_model[n].abs().sum())
+
+        else:
+            raise NotImplementedError(args.load_dir + '/' + test_model_name + str(task_id), "Load dir incorrect")
+
+        # EDIT: ???
         if args.task_type == 'concept':
             if 'shifted' in train_data.current_labels:
                 args.logger.print(train_data.current_labels)
@@ -143,7 +148,7 @@ def test(task_list, args, train_data, test_data, model):
                 args.logger.print(len(test_loaders[init].dataset.targets))
             else:
                 if_shift.append(False)
-
+        # EDIT: ???
         if args.modify_previous_ood and task_id > 0:
             assert args.model == 'oe' or args.model == 'oe_fixed_minibatch'
             param_copy = model.net.fc.weight.detach()
@@ -154,9 +159,9 @@ def test(task_list, args, train_data, test_data, model):
             w = torch.load(args.load_dir + f'/w_b_task_{task_id}')[0].to(args.device)
             b = torch.load(args.load_dir + f'/w_b_task_{task_id}')[1].to(args.device)
 
-        if args.train_clf_id is not None:
-            if task_id <= args.train_clf_id:
-                continue
+        # if args.train_clf_id is not None:
+        #     if task_id <= args.train_clf_id:
+        #         continue
 
 
 
@@ -172,11 +177,23 @@ def test(task_list, args, train_data, test_data, model):
                     text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_data.seen_names]).to(args.device)
                     zeroshot.evaluate(x, text_inputs, y)
             model.evaluate(x, y, task_id, w=w, b=b, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
+    
+        for t in range(task_id + 1):
+            model.cil_feature_list[t] = torch.cat(model.cil_feature_list[t])
+            model.cil_logits_list[t] = torch.cat(model.cil_logits_list[t])
+        torch.save(model.cil_feature_list, os.path.join(args.logger.dir(), f'cil_features_model_{task_id}_test_{task_id}'))
+        torch.save(model.cil_logits_list, os.path.join(args.logger.dir(), f'cil_logits_model_{task_id}_test_{task_id}'))
+        
         metrics = model.acc()
+
+        torch.save()
+        
+        # TODO: save model.cil_feature_list, with these info in the filename: TR_task_id, dataset tr, dataset T
         cil_tracker.update(metrics['cil_acc'], task_id, task_id)
         til_tracker.update(metrics['til_acc'], task_id, task_id)
         cal_cil_tracker.update(metrics['cal_cil_acc'], task_id, task_id)
 
+        # continue
 
         #################################################
         # OOD classes evaluation   
@@ -197,6 +214,15 @@ def test(task_list, args, train_data, test_data, model):
                         x, y = x.to(args.device), y.to(args.device)
                         with torch.no_grad():
                             model.evaluate(x, y, task_id=task_id, total_learned_task_id=task_id, ensemble=args.pass_ensemble)
+                    for t in range(task_id + 1):
+                        model.cil_feature_list[t] = torch.cat(model.cil_feature_list[t])
+                        model.cil_logits_list[t] = torch.cat(model.cil_logits_list[t])
+                    torch.save(model.cil_feature_list, os.path.join(args.logger.dir(), 
+                                                                    f'cil_features_model_{task_id}_test_{task_out}'))
+                    torch.save(model.cil_logits_list, os.path.join(args.logger.dir(), 
+                                                                   f'cil_logits_model_{task_id}_test_{task_out}'))
+        
+                    
                     metrics = model.acc()
 
                     if task_out <= task_id:
@@ -265,4 +291,5 @@ def test(task_list, args, train_data, test_data, model):
         torch.save(auc_softmax_tracker, os.path.join(tracker_path, '/auc_softmax_tracker_train_clf_equal_test'))
         torch.save(openworld_softmax_tracker, os.path.join(tracker_path, '/openworld_softmax_tracker_train_clf_equal_test'))
 
+    print("")
     return cil_tracker.mat, til_tracker.mat, cal_cil_tracker.mat

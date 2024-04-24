@@ -25,6 +25,8 @@ class ViTAdapter(BaseModel):
         self.cal_correct = 0.
         self.w, self.b = None, None
         self.cil_acc_mat_test = np.zeros((args.n_tasks + 1, args.n_tasks + 1)) - 100
+        self.cil_feature_list = {}  # EDIT: needed to use OOD detectors 
+        self.cil_logits_list = {}   # EDIT: needed to use OOD detectors 
 
         if args.distillation:
             self.criterion_distill = nn.KLDivLoss()
@@ -221,10 +223,21 @@ class ViTAdapter(BaseModel):
                 entropy_list = []
                 # Loop all the heads
                 # features, _ = self.net.forward_features(None, inputs, s=self.args.smax)
+                # self.cil_feature_list = {}
+                # self.cil_logits_list = {}
                 for t in range(total_learned_task_id + 1):
                     features, _ = self.net.forward_features(t, inputs, s=self.args.smax)
                     out = self.net.forward_classifier(t, features)
                     # out = out[:, t * self.num_cls_per_task:(t + 1) * self.num_cls_per_task]
+
+                    if t not in self.cil_feature_list.keys():
+                        self.cil_feature_list[t] = []
+                    if t not in self.cil_logits_list.keys():
+                        self.cil_logits_list[t] = []
+                    
+                    self.cil_feature_list[t].append(features.detach().cpu())
+                    self.cil_logits_list[t].append(out.detach().cpu())
+                    
 
                     if self.args.task_inference == 'entropy':
                         entropy_list.append(self.ent.compute(out))
@@ -268,6 +281,8 @@ class ViTAdapter(BaseModel):
             out_list = torch.cat(out_list, dim=1)
             output_ood = torch.cat(output_ood, dim=1)
 
+            self.out_list = out_list
+            
             if len(entropy_list) > 0:
                 # check if task_id_pred are correct
                 true_tasks = labels // self.num_cls_per_task
@@ -458,6 +473,7 @@ class ViTAdapter(BaseModel):
         self.output_list, self.label_list = [], []
         self.scores, self.scores_md, self.scores_total = [], [], []
         self.feature_list, self.label_list = [], []
+        self.cil_feature_list, self.cil_logits_list = {}, {}    # EDIT: added attributes
 
     def update_s(self, b, B):
         """
